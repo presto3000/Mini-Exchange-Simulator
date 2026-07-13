@@ -1,0 +1,26 @@
+# Visual Studio
+.vs/
+*.vcxproj*
+*.sln
+out/
+
+# CMake build directories
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+
+# Git
+.git/
+.gitignore
+
+# Editor/OS junk
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker itself
+Dockerfile*
+docker-compose*.yml
