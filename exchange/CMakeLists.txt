@@ -51,7 +51,23 @@ add_subdirectory(common)
 # add_subdirectory(persistence)
 # add_subdirectory(client)
 
+# --- Testing -------------------------------------------------------------
+
 if(EXCHANGE_ENABLE_TESTS)
     enable_testing()
-    # add_subdirectory(tests)   # added once GoogleTest is wired in
+
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.15.2
+    )
+    # Windows: force GoogleTest to link the same CRT as our own targets
+    # (MSVC defaults can mismatch: /MD vs /MT). Without this, linking will
+    # fail on Windows with cryptic LNK2038 errors.
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(googletest)
+
+    add_subdirectory(tests)
 endif()
