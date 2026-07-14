@@ -54,3 +54,19 @@ namespace exchange::common {
     using Timestamp = std::chrono::system_clock::time_point;
 
 } // namespace exchange::common
+
+
+// Specialize std::hash for StrongType so it can be used as a key in
+// std::unordered_map/std::unordered_set (e.g. OrderBook's OrderId index).
+// This must live in namespace std, per the standard's rules for
+// specializing library templates - it cannot be a free function or a
+// member of StrongType itself.
+namespace std {
+template <typename Tag, typename Underlying>
+struct hash<exchange::common::StrongType<Tag, Underlying>> {
+    std::size_t
+    operator()(const exchange::common::StrongType<Tag, Underlying>& value) const noexcept {
+        return std::hash<Underlying>{}(value.get());
+    }
+};
+} // namespace std

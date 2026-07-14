@@ -1,6 +1,6 @@
 add_library(common STATIC
     src/Logger.cpp
-)
+ "include/common/PriceLevel.hpp")
 
 target_include_directories(common
     PUBLIC
