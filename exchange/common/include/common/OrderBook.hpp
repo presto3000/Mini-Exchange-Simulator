@@ -118,6 +118,29 @@ public:
         return sellLevels_;
     }
 
+    // Removes an order from the side-index only, WITHOUT touching the
+    // PriceLevel's list. Used exclusively by MatchingEngine when a
+    // resting order has just been fully filled and already erased from
+    // its PriceLevel directly (via the iterator matching already has in
+    // hand) - this keeps the index in sync without a redundant second
+    // lookup-and-erase through the normal cancelOrder() path.
+    void forgetOrder(OrderId id) {
+        index_.erase(id);
+    }
+
+    // Shrinks a resting order's quantity in place, preserving its
+    // position (time priority) in its PriceLevel's queue. Used by
+    // MODIFY when quantity decreases - per price-time priority rules,
+    // a pure decrease does not forfeit queue position.
+    bool modifyRestingOrderQuantity(OrderId id, Quantity newQuantity) {
+        auto indexIt = index_.find(id);
+        if (indexIt == index_.end()) {
+            return false;
+        }
+        indexIt->second.orderIt->modify(indexIt->second.orderIt->price(), newQuantity);
+        return true;
+    }
+
 private:
     struct OrderLocation {
         Side side;

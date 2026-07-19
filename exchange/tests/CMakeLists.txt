@@ -3,6 +3,7 @@ add_executable(common_tests
     common/TradeTests.cpp
     common/PriceLevelTests.cpp
     common/OrderBookTests.cpp
+    common/MatchingEngineTests.cpp
 )
 
 target_link_libraries(common_tests
