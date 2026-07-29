@@ -26,6 +26,7 @@ namespace exchange::common {
     struct PriceTag {};
     struct QuantityTag {};
     struct OrderIdTag {};
+    struct BuyingPowerTag {};
 
     // Price expressed in integer ticks (e.g. cents), never floating point.
     // Rationale: floating point prices cause rounding/comparison bugs in
@@ -53,6 +54,14 @@ namespace exchange::common {
 
     using Timestamp = std::chrono::system_clock::time_point;
 
+    
+    // Total monetary buying power, in the same integer-cents/ticks unit as
+    // Price, but semantically distinct: a Price is "per share," BuyingPower
+    // is a total account balance. Kept as a separate StrongType so the
+    // compiler rejects any code that accidentally compares or assigns one
+    // to the other.
+    using BuyingPower = StrongType<BuyingPowerTag, std::int64_t>;
+
 } // namespace exchange::common
 
 
@@ -70,3 +79,6 @@ struct hash<exchange::common::StrongType<Tag, Underlying>> {
     }
 };
 } // namespace std
+
+
+

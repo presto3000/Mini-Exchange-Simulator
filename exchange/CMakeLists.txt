@@ -45,8 +45,7 @@ add_subdirectory(common)
 
 # Services are added in later milestones as they're implemented:
 # add_subdirectory(gateway)
-# add_subdirectory(matching_engine)
-# add_subdirectory(risk)
+add_subdirectory(risk)
 # add_subdirectory(market_data)
 # add_subdirectory(persistence)
 # add_subdirectory(client)
