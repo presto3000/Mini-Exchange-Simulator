@@ -37,6 +37,33 @@ if(EXCHANGE_ENABLE_CLANG_TIDY)
     endif()
 endif()
 
+# --- Boost.Asio ------------------------------------------------------------
+# Required by the Gateway for its client-facing TCP listener,
+# and by internal TCP links (Risk, Matching Engine) per the 
+# communication-layer decision.
+#
+# We use find_package, not FetchContent, for Boost specifically: Boost is
+# large enough (unlike GoogleTest) that building it from source on every
+# fresh checkout/CI run would add minutes to every build. Instead we
+# require it to be pre-installed via the platform's normal package manager:
+#   - Ubuntu/Docker: apt-get install libboost-system-dev
+#   - Windows (Visual Studio): vcpkg install boost-asio boost-system
+find_package(Boost 1.83 REQUIRED COMPONENTS system)
+
+
+# message(STATUS "Boost_FOUND = ${Boost_FOUND}")
+# message(STATUS "Boost_VERSION = ${Boost_VERSION}")
+# message(STATUS "Boost_DIR = ${Boost_DIR}")
+# 
+# get_property(_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+# message(STATUS "Targets: ${_targets}")
+# 
+# if(TARGET Boost::system)
+#     message(STATUS "FOUND Boost::system")
+# else()
+#     message(FATAL_ERROR "MISSING Boost::system")
+# endif()
+
 # --- Subprojects -------------------------------------------------------
 # Order matters only for readability here; CMake resolves dependencies
 # via target_link_libraries regardless of add_subdirectory order.
@@ -70,3 +97,5 @@ if(EXCHANGE_ENABLE_TESTS)
 
     add_subdirectory(tests)
 endif()
+
+
