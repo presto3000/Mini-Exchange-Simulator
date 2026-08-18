@@ -1,730 +1,364 @@
-# \# Mini Exchange Simulator
+# Mini Exchange Simulator
 
-# 
+A C++20 low-latency architecture demo of a simplified electronic exchange.
 
-# A C++20 low-latency architecture demo of a simplified electronic exchange.
+The project implements a **price-time priority matching engine**, **pre-trade risk service**, and **client gateway**, connected through a small binary-framed TCP protocol.
 
-# 
+The design prioritizes:
 
-# The project implements a \*\*price-time priority matching engine\*\*, \*\*pre-trade risk service\*\*, and \*\*client gateway\*\*, connected through a small binary-framed TCP protocol.
+* Correct matching semantics
+* Clear service boundaries
+* Predictable single-threaded execution in the matching hot path
+* Strongly typed domain values
+* A realistic distributed architecture without unnecessary complexity
 
-# 
+> **Note:** This is an educational architecture demonstration, not a production trading system.
 
-# The design prioritizes:
+## Architecture
 
-# 
+```text
+                     TCP :9000
+Client ─────────────────────────────► Gateway
+                                      │
+                                      │ TCP :9200
+                                      ▼
+                                    Risk
+                                      │
+                                      │ TCP :9100
+                                      ▼
+                              Matching Engine
+```
 
-# \* Correct matching semantics
+The gateway can also run the order-processing path in-process for development and testing.
 
-# \* Clear service boundaries
+```text
+Client
+  │
+  │ TCP :9000
+  ▼
+Gateway
+  │
+  ├── in-process ───────────────► Risk
+  │
+  └── TCP :9200 ────────────────► Risk
+                                   │
+                                   │ TCP :9100
+                                   ▼
+                            Matching Engine
+```
 
-# \* Predictable single-threaded execution in the matching hot path
+### Components
 
-# \* Strongly typed domain values
+| Component           |   Port | Responsibility                                                               |
+| ------------------- | -----: | ---------------------------------------------------------------------------- |
+| **Gateway**         | `9000` | Accepts client connections and dispatches orders                             |
+| **Risk**            | `9200` | Performs pre-trade risk checks and forwards approved orders                  |
+| **Matching Engine** | `9100` | Maintains the order book, performs price-time matching, and generates trades |
+| **Common**          |      — | Shared domain types, matching logic, protocol, networking, and logging       |
 
-# \* A realistic distributed architecture without unnecessary complexity
+## Core Design
 
-# 
+### One engine, one order book
 
-# > \*\*Note:\*\* This is an educational architecture demonstration, not a production trading system.
+Each `MatchingEngine` owns exactly one `OrderBook` for one symbol.
 
-# 
+The matching engine is intentionally **single-threaded**. There are no locks in the matching hot path.
 
-# \## Architecture
+Scaling is achieved by running multiple matching engines, typically one per symbol or symbol partition, rather than introducing synchronization into the core matching logic.
 
-# 
+```text
+Symbol A ──► Matching Engine A ──► OrderBook A
+Symbol B ──► Matching Engine B ──► OrderBook B
+Symbol C ──► Matching Engine C ──► OrderBook C
+```
 
-# ```text
+This keeps the matching algorithm deterministic and makes its concurrency model explicit.
 
-# &#x20;                    TCP :9000
+### Strong domain types
 
-# Client ─────────────────────────────► Gateway
+The common library uses dedicated value types for important domain concepts:
 
-# &#x20;                                     │
+* `Price`
+* `Quantity`
+* `OrderId`
+* `BuyingPower`
 
-# &#x20;                                     │ TCP :9200
+Prices are represented as **integer ticks** rather than floating-point values. This avoids floating-point rounding issues and makes price comparisons deterministic.
 
-# &#x20;                                     ▼
+### Value-oriented hot path
 
-# &#x20;                                   Risk
+Orders and related domain objects are plain value types rather than polymorphic class hierarchies.
 
-# &#x20;                                     │
+The goal is to keep the matching path simple, predictable, and easy to reason about.
 
-# &#x20;                                     │ TCP :9100
+## Matching Rules
 
-# &#x20;                                     ▼
+The matching engine implements strict **price-time priority**.
 
-# &#x20;                             Matching Engine
+### New orders
 
-# ```
+* Aggressive orders match immediately against the opposite side of the book.
+* Matches are executed according to price priority first, then FIFO time priority.
+* Any remaining quantity rests on the book.
+* A single incoming order may match against multiple price levels.
 
-# 
+### Cancels
 
-# The gateway can also run the order-processing path in-process for development and testing.
+Cancellation is **idempotent**.
 
-# 
+Attempting to cancel an order that has already been filled or cancelled is treated as a normal case rather than an error.
 
-# ```text
+### Modify
 
-# Client
+Modification follows these rules:
 
-# &#x20; │
+| Modification            | Time Priority |
+| ----------------------- | ------------- |
+| Price changes           | Lost          |
+| Quantity increases      | Lost          |
+| Quantity decreases only | Preserved     |
 
-# &#x20; │ TCP :9000
+A modification that loses priority is handled as a remove/reinsert operation and is subsequently eligible for matching again.
 
-# &#x20; ▼
+A quantity reduction that does not change the price preserves the order's existing queue position.
 
-# Gateway
+## Common Library
 
-# &#x20; │
+The `common` library contains the core exchange building blocks:
 
-# &#x20; ├── in-process ───────────────► Risk
+```text
+common/
+├── Strong domain types
+├── Order
+├── PriceLevel
+├── OrderBook
+├── MatchingEngine
+├── Trade
+├── Binary protocol
+├── Boost.Asio networking
+└── Structured logging
+```
 
-# &#x20; │
+### Binary Protocol
 
-# &#x20; └── TCP :9200 ────────────────► Risk
+Communication between services uses a **length-prefixed binary protocol** implemented on top of TCP.
 
-# &#x20;                                  │
+Boost.Asio provides the networking layer and reusable frame server/client components.
 
-# &#x20;                                  │ TCP :9100
+The protocol is intentionally small and explicit so that service boundaries remain easy to inspect and test.
 
-# &#x20;                                  ▼
+## Project Layout
 
-# &#x20;                           Matching Engine
+```text
+exchange/
+├── common/               # Shared types, order book, matching engine, protocol, networking
+├── gateway/              # Client-facing gateway
+├── risk/                 # Pre-trade risk service
+├── matching_engine/      # Matching engine service
+├── tests/                # Unit and integration tests
+├── docker/               # Dockerfiles
+├── cmake/                # CMake helpers and compiler warnings
+└── CMakeLists.txt
+```
 
-# ```
+## Building
 
-# 
+### Prerequisites
 
-# \### Components
+* CMake `>= 3.25`
+* C++20-compatible compiler
+* Boost `>= 1.83`
+* GoogleTest for the test suite
 
-# 
+Boost is expected to be available as a system dependency for the native build.
 
-# | Component           |   Port | Responsibility                                                               |
+### Native Build
 
-# | ------------------- | -----: | ---------------------------------------------------------------------------- |
+```bash
+cd exchange
 
-# | \*\*Gateway\*\*         | `9000` | Accepts client connections and dispatches orders                             |
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+```
 
-# | \*\*Risk\*\*            | `9200` | Performs pre-trade risk checks and forwards approved orders                  |
+Run the tests:
 
-# | \*\*Matching Engine\*\* | `9100` | Maintains the order book, performs price-time matching, and generates trades |
+```bash
+ctest --test-dir build --output-on-failure
+```
 
-# | \*\*Common\*\*          |      — | Shared domain types, matching logic, protocol, networking, and logging       |
+Individual test executables can also be run directly from the build directory.
 
-# 
+### Useful Targets
 
-# \## Core Design
+```text
+common
+gateway
+risk
+matching_engine
+*_tests
+```
 
-# 
+## Docker
 
-# \### One engine, one order book
+Build the base image:
 
-# 
+```bash
+docker build \
+  -f docker/base.Dockerfile \
+  -t mini-exchange-base .
+```
 
-# Each `MatchingEngine` owns exactly one `OrderBook` for one symbol.
+Start the full stack:
 
-# 
+```bash
+docker compose up --build
+```
 
-# The matching engine is intentionally \*\*single-threaded\*\*. There are no locks in the matching hot path.
+The services are exposed on:
 
-# 
+```text
+Gateway          localhost:9000
+Risk             localhost:9200
+Matching Engine  localhost:9100
+```
 
-# Scaling is achieved by running multiple matching engines, typically one per symbol or symbol partition, rather than introducing synchronization into the core matching logic.
+Startup races between containers are handled with simple retry and backoff logic.
 
-# 
+For a production deployment, this would typically be replaced or supplemented by proper service health checks and orchestration.
 
-# ```text
+## Configuration
 
-# Symbol A ──► Matching Engine A ──► OrderBook A
+Service connectivity can be configured through environment variables.
 
-# Symbol B ──► Matching Engine B ──► OrderBook B
+Examples include:
 
-# Symbol C ──► Matching Engine C ──► OrderBook C
+```text
+GATEWAY_ORDER_PROCESSOR=remote|inprocess
+RISK_HOST=<host>
+MATCHING_ENGINE_HOST=<host>
+```
 
-# ```
+The `inprocess` gateway mode is useful for local development and tests, while the `remote` mode exercises the service-to-service TCP architecture.
 
-# 
+## Testing
 
-# This keeps the matching algorithm deterministic and makes its concurrency model explicit.
+The project includes unit and integration tests covering the core exchange behavior.
 
-# 
+Important matching scenarios include:
 
-# \### Strong domain types
+* Price priority
+* FIFO time priority
+* Aggressive order matching
+* Partial fills
+* Orders resting on the book
+* Multi-level matching
+* Idempotent cancellation
+* Quantity-reduction modifications
+* Priority-resetting modifications
+* Risk rejection
+* Binary protocol framing
+* Service-to-service communication
 
-# 
+Run the complete test suite with:
 
-# The common library uses dedicated value types for important domain concepts:
+```bash
+ctest --test-dir build --output-on-failure
+```
 
-# 
+## Static Analysis and Compiler Warnings
 
-# \* `Price`
+Compiler warnings are configured through:
 
-# \* `Quantity`
+```text
+cmake/CompilerWarnings.cmake
+```
 
-# \* `OrderId`
+To enable `clang-tidy`:
 
-# \* `BuyingPower`
+```bash
+cmake -S . -B build \
+  -DEXCHANGE_ENABLE_CLANG_TIDY=ON
+```
 
-# 
+Then build normally:
 
-# Prices are represented as \*\*integer ticks\*\* rather than floating-point values. This avoids floating-point rounding issues and makes price comparisons deterministic.
+```bash
+cmake --build build -j
+```
 
-# 
+## Design Principles
 
-# \### Value-oriented hot path
+The project intentionally favors a few principles over feature completeness:
 
-# 
+### No floating-point prices
 
-# Orders and related domain objects are plain value types rather than polymorphic class hierarchies.
+All prices are represented using integer ticks.
 
-# 
+This makes equality and ordering deterministic and avoids the ambiguity introduced by floating-point arithmetic.
 
-# The goal is to keep the matching path simple, predictable, and easy to reason about.
+### No locks in the matching engine
 
-# 
+The matching engine is single-threaded by design.
 
-# \## Matching Rules
+Concurrency is handled at the architecture level by partitioning work across multiple engines rather than protecting the order book with mutexes.
 
-# 
+### Explicit ownership
 
-# The matching engine implements strict \*\*price-time priority\*\*.
+A matching engine owns exactly one order book.
 
-# 
+This makes the state that must remain consistent during matching explicit and local.
 
-# \### New orders
+### Simple value types
 
-# 
+The hot path favors structs and value types over inheritance and polymorphism.
 
-# \* Aggressive orders match immediately against the opposite side of the book.
+This keeps the core model compact and makes the matching algorithm easier to test.
 
-# \* Matches are executed according to price priority first, then FIFO time priority.
+### Realistic service boundaries
 
-# \* Any remaining quantity rests on the book.
+Gateway, risk, and matching are separate services in the remote configuration.
 
-# \* A single incoming order may match against multiple price levels.
+This provides a realistic example of how exchange components can be separated without attempting to reproduce the complexity of a production exchange.
 
-# 
+## Future Extensions
 
-# \### Cancels
+The CMake structure leaves room for additional modules, including:
 
-# 
+* Market data dissemination
+* Persistence / journaling
+* Multi-symbol orchestration
+* Additional order types
+* Replay tooling
+* Metrics and observability
+* More advanced risk controls
 
-# Cancellation is \*\*idempotent\*\*.
+These are intentionally outside the scope of the current implementation.
 
-# 
+## Limitations
 
-# Attempting to cancel an order that has already been filled or cancelled is treated as a normal case rather than an error.
+This project is **not intended to be a production-ready exchange**.
 
-# 
+It intentionally omits or simplifies areas such as:
 
-# \### Modify
+* Durable event persistence
+* Crash recovery
+* Distributed consensus
+* High-availability failover
+* Authentication and authorization
+* TLS
+* Production-grade service discovery
+* Advanced market-data distribution
+* Comprehensive exchange order types
+* Production-grade risk management
+* Kernel-bypass or specialized network I/O
 
-# 
+The goal is to demonstrate the architecture and correctness of the core exchange concepts in a compact C++20 codebase.
 
-# Modification follows these rules:
+## License
 
-# 
+MIT License. See [`LICENSE`](LICENSE) for details.
 
-# | Modification            | Time Priority |
+---
 
-# | ----------------------- | ------------- |
-
-# | Price changes           | Lost          |
-
-# | Quantity increases      | Lost          |
-
-# | Quantity decreases only | Preserved     |
-
-# 
-
-# A modification that loses priority is handled as a remove/reinsert operation and is subsequently eligible for matching again.
-
-# 
-
-# A quantity reduction that does not change the price preserves the order's existing queue position.
-
-# 
-
-# \## Common Library
-
-# 
-
-# The `common` library contains the core exchange building blocks:
-
-# 
-
-# ```text
-
-# common/
-
-# ├── Strong domain types
-
-# ├── Order
-
-# ├── PriceLevel
-
-# ├── OrderBook
-
-# ├── MatchingEngine
-
-# ├── Trade
-
-# ├── Binary protocol
-
-# ├── Boost.Asio networking
-
-# └── Structured logging
-
-# ```
-
-# 
-
-# \### Binary Protocol
-
-# 
-
-# Communication between services uses a \*\*length-prefixed binary protocol\*\* implemented on top of TCP.
-
-# 
-
-# Boost.Asio provides the networking layer and reusable frame server/client components.
-
-# 
-
-# The protocol is intentionally small and explicit so that service boundaries remain easy to inspect and test.
-
-# 
-
-# \## Project Layout
-
-# 
-
-# ```text
-
-# exchange/
-
-# ├── common/               # Shared types, order book, matching engine, protocol, networking
-
-# ├── gateway/              # Client-facing gateway
-
-# ├── risk/                 # Pre-trade risk service
-
-# ├── matching\_engine/      # Matching engine service
-
-# ├── tests/                # Unit and integration tests
-
-# ├── docker/               # Dockerfiles
-
-# ├── cmake/                # CMake helpers and compiler warnings
-
-# └── CMakeLists.txt
-
-# ```
-
-# 
-
-# \## Building
-
-# 
-
-# \### Prerequisites
-
-# 
-
-# \* CMake `>= 3.25`
-
-# \* C++20-compatible compiler
-
-# \* Boost `>= 1.83`
-
-# \* GoogleTest for the test suite
-
-# 
-
-# Boost is expected to be available as a system dependency for the native build.
-
-# 
-
-# \### Native Build
-
-# 
-
-# ```bash
-
-# cd exchange
-
-# 
-
-# cmake -S . -B build -DCMAKE\_BUILD\_TYPE=Debug
-
-# cmake --build build -j
-
-# ```
-
-# 
-
-# Run the tests:
-
-# 
-
-# ```bash
-
-# ctest --test-dir build --output-on-failure
-
-# ```
-
-# 
-
-# Individual test executables can also be run directly from the build directory.
-
-# 
-
-# \### Useful Targets
-
-# 
-
-# ```text
-
-# common
-
-# gateway
-
-# risk
-
-# matching\_engine
-
-# \*\_tests
-
-# ```
-
-# 
-
-# \## Docker
-
-# 
-
-# Build the base image:
-
-# 
-
-# ```bash
-
-# docker build \\
-
-# &#x20; -f docker/base.Dockerfile \\
-
-# &#x20; -t mini-exchange-base .
-
-# ```
-
-# 
-
-# Start the full stack:
-
-# 
-
-# ```bash
-
-# docker compose up --build
-
-# ```
-
-# 
-
-# The services are exposed on:
-
-# 
-
-# ```text
-
-# Gateway          localhost:9000
-
-# Risk             localhost:9200
-
-# Matching Engine  localhost:9100
-
-# ```
-
-# 
-
-# Startup races between containers are handled with simple retry and backoff logic.
-
-# 
-
-# For a production deployment, this would typically be replaced or supplemented by proper service health checks and orchestration.
-
-# 
-
-# \## Configuration
-
-# 
-
-# Service connectivity can be configured through environment variables.
-
-# 
-
-# Examples include:
-
-# 
-
-# ```text
-
-# GATEWAY\_ORDER\_PROCESSOR=remote|inprocess
-
-# RISK\_HOST=<host>
-
-# MATCHING\_ENGINE\_HOST=<host>
-
-# ```
-
-# 
-
-# The `inprocess` gateway mode is useful for local development and tests, while the `remote` mode exercises the service-to-service TCP architecture.
-
-# 
-
-# \## Testing
-
-# 
-
-# The project includes unit and integration tests covering the core exchange behavior.
-
-# 
-
-# Important matching scenarios include:
-
-# 
-
-# \* Price priority
-
-# \* FIFO time priority
-
-# \* Aggressive order matching
-
-# \* Partial fills
-
-# \* Orders resting on the book
-
-# \* Multi-level matching
-
-# \* Idempotent cancellation
-
-# \* Quantity-reduction modifications
-
-# \* Priority-resetting modifications
-
-# \* Risk rejection
-
-# \* Binary protocol framing
-
-# \* Service-to-service communication
-
-# 
-
-# Run the complete test suite with:
-
-# 
-
-# ```bash
-
-# ctest --test-dir build --output-on-failure
-
-# ```
-
-# 
-
-# \## Static Analysis and Compiler Warnings
-
-# 
-
-# Compiler warnings are configured through:
-
-# 
-
-# ```text
-
-# cmake/CompilerWarnings.cmake
-
-# ```
-
-# 
-
-# To enable `clang-tidy`:
-
-# 
-
-# ```bash
-
-# cmake -S . -B build \\
-
-# &#x20; -DEXCHANGE\_ENABLE\_CLANG\_TIDY=ON
-
-# ```
-
-# 
-
-# Then build normally:
-
-# 
-
-# ```bash
-
-# cmake --build build -j
-
-# ```
-
-# 
-
-# \## Design Principles
-
-# 
-
-# The project intentionally favors a few principles over feature completeness:
-
-# 
-
-# \### No floating-point prices
-
-# 
-
-# All prices are represented using integer ticks.
-
-# 
-
-# This makes equality and ordering deterministic and avoids the ambiguity introduced by floating-point arithmetic.
-
-# 
-
-# \### No locks in the matching engine
-
-# 
-
-# The matching engine is single-threaded by design.
-
-# 
-
-# Concurrency is handled at the architecture level by partitioning work across multiple engines rather than protecting the order book with mutexes.
-
-# 
-
-# \### Explicit ownership
-
-# 
-
-# A matching engine owns exactly one order book.
-
-# 
-
-# This makes the state that must remain consistent during matching explicit and local.
-
-# 
-
-# \### Simple value types
-
-# 
-
-# The hot path favors structs and value types over inheritance and polymorphism.
-
-# 
-
-# This keeps the core model compact and makes the matching algorithm easier to test.
-
-# 
-
-# \### Realistic service boundaries
-
-# 
-
-# Gateway, risk, and matching are separate services in the remote configuration.
-
-# 
-
-# This provides a realistic example of how exchange components can be separated without attempting to reproduce the complexity of a production exchange.
-
-# 
-
-# \## Future Extensions
-
-# 
-
-# The CMake structure leaves room for additional modules, including:
-
-# 
-
-# \* Market data dissemination
-
-# \* Persistence / journaling
-
-# \* Multi-symbol orchestration
-
-# \* Additional order types
-
-# \* Replay tooling
-
-# \* Metrics and observability
-
-# \* More advanced risk controls
-
-# 
-
-# These are intentionally outside the scope of the current implementation.
-
-# 
-
-# \## Limitations
-
-# 
-
-# This project is \*\*not intended to be a production-ready exchange\*\*.
-
-# 
-
-# It intentionally omits or simplifies areas such as:
-
-# 
-
-# \* Durable event persistence
-
-# \* Crash recovery
-
-# \* Distributed consensus
-
-# \* High-availability failover
-
-# \* Authentication and authorization
-
-# \* TLS
-
-# \* Production-grade service discovery
-
-# \* Advanced market-data distribution
-
-# \* Comprehensive exchange order types
-
-# \* Production-grade risk management
-
-# \* Kernel-bypass or specialized network I/O
-
-# 
-
-# The goal is to demonstrate the architecture and correctness of the core exchange concepts in a compact C++20 codebase.
-
-# 
-
-# \## License
-
-# 
-
-# MIT License. See \[`LICENSE`](LICENSE) for details.
-
-# 
-
-# \---
-
-# 
-
-# \*\*Mini Exchange Simulator\*\* is an educational project focused on demonstrating a correct matching engine, strongly typed exchange domain model, pre-trade risk checks, and lightweight service-oriented architecture in modern C++20.
-
-
-
+**Mini Exchange Simulator** is an educational project focused on demonstrating a correct matching engine, strongly typed exchange domain model, pre-trade risk checks, and lightweight service-oriented architecture in modern C++20.
