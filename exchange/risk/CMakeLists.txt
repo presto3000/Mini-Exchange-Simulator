@@ -1,14 +1,7 @@
 add_library(risk_lib INTERFACE)
 
-target_include_directories(risk_lib
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(risk_lib
-    INTERFACE
-        common
-)
+target_include_directories(risk_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(risk_lib INTERFACE common Boost::system)
 
 target_compile_features(risk_lib INTERFACE cxx_std_20)
 

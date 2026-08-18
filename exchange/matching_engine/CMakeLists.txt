@@ -1,0 +1,10 @@
+add_library(matching_engine_lib INTERFACE)
+
+target_include_directories(matching_engine_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(matching_engine_lib INTERFACE common Boost::system)
+
+target_compile_features(matching_engine_lib INTERFACE cxx_std_20)
+
+add_executable(matching_engine_service src/main.cpp)
+target_link_libraries(matching_engine_service PRIVATE matching_engine_lib)
+exchange_set_warnings(matching_engine_service)

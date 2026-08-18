@@ -69,10 +69,9 @@ find_package(Boost 1.83 REQUIRED COMPONENTS system)
 # via target_link_libraries regardless of add_subdirectory order.
 
 add_subdirectory(common)
-
-# Services are added in later milestones as they're implemented:
 add_subdirectory(gateway)
 add_subdirectory(risk)
+add_subdirectory(matching_engine)
 # add_subdirectory(market_data)
 # add_subdirectory(persistence)
 # add_subdirectory(client)

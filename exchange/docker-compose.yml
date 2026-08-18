@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  matching_engine:
+    build:
+      context: .
+      dockerfile: docker/matching_engine.Dockerfile
+    ports:
+      - "9100:9100"
+
+  risk:
+    build:
+      context: .
+      dockerfile: docker/risk.Dockerfile
+    environment:
+      MATCHING_ENGINE_HOST: matching_engine
+      MATCHING_ENGINE_PORT: "9100"
+    ports:
+      - "9200:9200"
+    depends_on:
+      - matching_engine
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway.Dockerfile
+    environment:
+      GATEWAY_ORDER_PROCESSOR: remote
+      RISK_HOST: risk
+      RISK_PORT: "9200"
+    ports:
+      - "9000:9000"
+    depends_on:
+      - risk
+
+# market_data, persistence, and postgres are added in their own
+# once those services exist; client is added once it's built.
