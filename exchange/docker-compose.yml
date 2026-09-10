@@ -1,12 +1,24 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: exchange
+      POSTGRES_USER: exchange
+      POSTGRES_PASSWORD: exchange
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   matching_engine:
     build:
       context: .
       dockerfile: docker/matching_engine.Dockerfile
     ports:
       - "9100:9100"
+      - "9500:9500"   # trade event PUB feed
 
   risk:
     build:
@@ -33,5 +45,33 @@ services:
     depends_on:
       - risk
 
-# market_data, persistence, and postgres are added in their own
-# once those services exist; client is added once it's built.
+  persistence:
+    build:
+      context: .
+      dockerfile: docker/persistence.Dockerfile
+    environment:
+      MATCHING_ENGINE_HOST: matching_engine
+      MATCHING_ENGINE_PUB_PORT: "9500"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: exchange
+      POSTGRES_USER: exchange
+      POSTGRES_PASSWORD: exchange
+    depends_on:
+      - matching_engine
+      - postgres
+
+  market_data:
+    build:
+      context: .
+      dockerfile: docker/market_data.Dockerfile
+    environment:
+      MATCHING_ENGINE_HOST: matching_engine
+      MATCHING_ENGINE_PUB_PORT: "9500"
+    ports:
+      - "9600:9600"
+    depends_on:
+      - matching_engine
+
+volumes:
+  pgdata:

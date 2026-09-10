@@ -1,0 +1,8 @@
+add_library(persistence_lib INTERFACE)
+target_include_directories(persistence_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(persistence_lib INTERFACE common cppzmq_headers exchange_pqxx)
+target_compile_features(persistence_lib INTERFACE cxx_std_20)
+
+add_executable(persistence_service src/main.cpp)
+target_link_libraries(persistence_service PRIVATE persistence_lib)
+exchange_set_warnings(persistence_service)

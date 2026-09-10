@@ -50,3 +50,20 @@ TEST(MatchingDispatcherTest, MalformedPayloadRejectsCleanly) {
     ASSERT_TRUE(response.has_value());
     EXPECT_EQ(response->type, MessageType::OrderReject);
 }
+
+TEST(MatchingDispatcherTest, TradeSinkIsInvokedForEachGeneratedTrade) {
+    std::vector<common::Trade> published;
+    matching_engine::MatchingDispatcher dispatcher(
+        [&published](const common::Trade& t) { published.push_back(t); });
+
+    common::Order sell(common::OrderId(1), "AAPL", common::Side::Sell, common::Price(100),
+                       common::Quantity(10), common::Timestamp{});
+    dispatcher.handle(*tryDecodeFrame(buildNewOrderFrame(sell)));
+
+    common::Order buy(common::OrderId(2), "AAPL", common::Side::Buy, common::Price(100),
+                      common::Quantity(10), common::Timestamp{});
+    dispatcher.handle(*tryDecodeFrame(buildNewOrderFrame(buy)));
+
+    ASSERT_EQ(published.size(), 1u);
+    EXPECT_EQ(published[0].price(), common::Price(100));
+}

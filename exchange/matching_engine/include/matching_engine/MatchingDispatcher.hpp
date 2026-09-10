@@ -3,19 +3,24 @@
 #include "common/MatchingEngine.hpp"
 #include "common/protocol/Messages.hpp"
 #include "common/protocol/Frame.hpp"
+
+#include <functional>
 #include <unordered_map>
+#include <utility>
 
 namespace exchange::matching_engine {
 
-// Server-side handler for the standalone Matching Engine service.
-// Assumes every order it receives has ALREADY passed risk checks (Risk
-// is the only expected caller) - this never rejects for risk reasons,
-// only for message-format problems. One common::MatchingEngine per
-// symbol, created lazily - the same sharding approach validated inside
-// InProcessOrderProcessor, now genuinely running in its
-// own process rather than embedded in Gateway.
+using TradeSink = std::function<void(const common::Trade&)>;
+
 class MatchingDispatcher {
 public:
+    // 'sink' defaults to a no-op, so existing tests that
+    // construct MatchingDispatcher with no arguments keep compiling and
+    // behaving identically - publishing is additive, not a breaking
+    // change to the dispatcher's core responsibility.
+    explicit MatchingDispatcher(TradeSink sink = [](const common::Trade&) {})
+        : tradeSink_(std::move(sink)) {}
+
     std::vector<std::byte> handle(const common::protocol::DecodedFrame& frame) {
         using namespace common::protocol;
         try {
@@ -25,23 +30,25 @@ public:
                 common::Order order = readOrder(reader);
                 auto& engine = engineFor(order.symbol());
                 auto trades = engine.submitOrder(std::move(order));
+                publishAll(trades);
                 return encodeAck(order.id(), std::move(trades));
-            }
-            case MessageType::CancelOrder: {
-                auto msg = readCancelOrder(reader);
-                for (auto& [symbol, engine] : engines_) {
-                    if (engine.cancelOrder(msg.orderId)) {
-                        return encodeAck(msg.orderId, {});
-                    }
-                }
-                return encodeReject(msg.orderId, "order not found");
             }
             case MessageType::ModifyOrder: {
                 auto msg = readModifyOrder(reader);
                 for (auto& [symbol, engine] : engines_) {
                     auto result = engine.modifyOrder(msg.orderId, msg.newPrice, msg.newQuantity);
                     if (result.has_value()) {
+                        publishAll(*result);
                         return encodeAck(msg.orderId, std::move(*result));
+                    }
+                }
+                return encodeReject(msg.orderId, "order not found");
+            }
+            case MessageType::CancelOrder: {
+                auto msg = readCancelOrder(reader);
+                for (auto& [symbol, engine] : engines_) {
+                    if (engine.cancelOrder(msg.orderId)) {
+                        return encodeAck(msg.orderId, {});
                     }
                 }
                 return encodeReject(msg.orderId, "order not found");
@@ -55,11 +62,15 @@ public:
     }
 
 private:
+    void publishAll(const std::vector<common::Trade>& trades) {
+        for (const auto& trade : trades)
+            tradeSink_(trade);
+    }
+
     common::MatchingEngine& engineFor(const common::Symbol& symbol) {
         auto it = engines_.find(symbol);
-        if (it == engines_.end()) {
+        if (it == engines_.end())
             it = engines_.emplace(symbol, common::MatchingEngine(symbol)).first;
-        }
         return it->second;
     }
 
@@ -75,6 +86,7 @@ private:
     }
 
     std::unordered_map<common::Symbol, common::MatchingEngine> engines_;
+    TradeSink tradeSink_;
 };
 
 } // namespace exchange::matching_engine

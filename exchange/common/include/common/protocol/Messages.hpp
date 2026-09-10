@@ -81,4 +81,39 @@ inline OrderRejectMessage readOrderReject(ByteReader& r) {
     return OrderRejectMessage{id, std::move(reason)};
 }
 
+// Published by Market Data after processing each trade. Deliberately
+// approximate: bestBid/bestAsk here are derived from the last traded
+// price only (see MarketDataStore's class comment for why), NOT from a
+// real resting order book - Market Data never sees the order book
+// directly per the spec ("Receives trade events"), only the trade
+// stream. A genuine top-of-book feed is listed as a future improvement.
+struct MarketDataSnapshotMessage {
+    Symbol symbol;
+    Price bestBid;
+    Price bestAsk;
+    Price lastPrice;
+    Quantity lastQuantity;
+    Timestamp timestamp;
+};
+
+inline void writeMarketDataSnapshot(ByteWriter& w, const MarketDataSnapshotMessage& m) {
+    w.writeString(m.symbol);
+    w.writeInt64(m.bestBid.get());
+    w.writeInt64(m.bestAsk.get());
+    w.writeInt64(m.lastPrice.get());
+    w.writeInt64(m.lastQuantity.get());
+    w.writeInt64(m.timestamp.time_since_epoch().count());
+}
+inline MarketDataSnapshotMessage readMarketDataSnapshot(ByteReader& r) {
+    Symbol symbol = r.readString();
+    const Price bestBid(r.readInt64());
+    const Price bestAsk(r.readInt64());
+    const Price lastPrice(r.readInt64());
+    const Quantity lastQty(r.readInt64());
+    const Timestamp::duration::rep ticks = r.readInt64();
+    return MarketDataSnapshotMessage{std::move(symbol), bestBid,
+                                     bestAsk,           lastPrice,
+                                     lastQty,           Timestamp{Timestamp::duration(ticks)}};
+}
+
 } // namespace exchange::common::protocol

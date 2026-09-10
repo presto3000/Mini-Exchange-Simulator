@@ -50,6 +50,78 @@ endif()
 #   - Windows (Visual Studio): vcpkg install boost-asio boost-system
 find_package(Boost 1.83 REQUIRED COMPONENTS system)
 
+# --- ZeroMQ ------------------------------------------------------------
+
+if(WIN32)
+    find_package(ZeroMQ CONFIG REQUIRED)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ZeroMQ REQUIRED IMPORTED_TARGET libzmq)
+endif()
+
+include(FetchContent)
+
+FetchContent_Declare(
+    cppzmq
+    GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
+    GIT_TAG        v4.10.0
+)
+
+FetchContent_Populate(cppzmq)
+
+add_library(cppzmq_headers INTERFACE)
+
+target_include_directories(
+    cppzmq_headers
+    INTERFACE
+        ${cppzmq_SOURCE_DIR}
+)
+
+
+if(WIN32)
+    if(TARGET libzmq)
+        target_link_libraries(cppzmq_headers INTERFACE libzmq)
+    elseif(TARGET ZeroMQ::ZeroMQ)
+        target_link_libraries(cppzmq_headers INTERFACE ZeroMQ::ZeroMQ)
+    elseif(TARGET ZeroMQ::libzmq)
+        target_link_libraries(cppzmq_headers INTERFACE ZeroMQ::libzmq)
+    else()
+        message(FATAL_ERROR
+            "ZeroMQ was found, but no known CMake target exists. "
+            "Available targets need to be inspected."
+        )
+    endif()
+else()
+    target_link_libraries(
+        cppzmq_headers
+        INTERFACE
+            PkgConfig::ZeroMQ
+    )
+endif()
+
+
+# --- PostgreSQL client (libpqxx) ----------------------------------------
+
+# --- PostgreSQL client (libpqxx) ----------------------------------------
+
+if(WIN32)
+    find_package(libpqxx CONFIG REQUIRED)
+
+    add_library(exchange_pqxx INTERFACE)
+    target_link_libraries(exchange_pqxx
+        INTERFACE
+            libpqxx::pqxx
+    )
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PQXX REQUIRED IMPORTED_TARGET libpqxx)
+
+    add_library(exchange_pqxx INTERFACE)
+    target_link_libraries(exchange_pqxx
+        INTERFACE
+            PkgConfig::PQXX
+    )
+endif()
 
 # message(STATUS "Boost_FOUND = ${Boost_FOUND}")
 # message(STATUS "Boost_VERSION = ${Boost_VERSION}")
@@ -72,8 +144,8 @@ add_subdirectory(common)
 add_subdirectory(gateway)
 add_subdirectory(risk)
 add_subdirectory(matching_engine)
-# add_subdirectory(market_data)
-# add_subdirectory(persistence)
+add_subdirectory(market_data)
+add_subdirectory(persistence)
 # add_subdirectory(client)
 
 # --- Testing -------------------------------------------------------------

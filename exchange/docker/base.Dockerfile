@@ -1,12 +1,11 @@
 FROM ubuntu:24.04 AS build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    ninja-build \
-    git \
-    ca-certificates \
+    build-essential cmake ninja-build git ca-certificates \
     libboost-system-dev \
+    libzmq3-dev \
+    libpqxx-dev libpq-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src

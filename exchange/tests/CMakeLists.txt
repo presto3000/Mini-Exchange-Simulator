@@ -27,6 +27,19 @@ add_executable(gateway_tests
 target_link_libraries(gateway_tests PRIVATE gateway_lib risk_lib matching_engine_lib GTest::gtest_main)
 exchange_set_warnings(gateway_tests)
 
+add_executable(market_data_tests
+    market_data/MarketDataStoreTests.cpp
+    market_data/TradeEventHandlerTests.cpp
+)
+target_link_libraries(market_data_tests PRIVATE market_data_lib GTest::gtest_main)
+exchange_set_warnings(market_data_tests)
+
+add_executable(persistence_tests
+    persistence/TradeEventHandlerTests.cpp
+)
+target_link_libraries(persistence_tests PRIVATE persistence_lib GTest::gtest_main)
+exchange_set_warnings(persistence_tests)
+
 target_include_directories(risk_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 target_include_directories(gateway_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 
@@ -35,3 +48,5 @@ gtest_discover_tests(common_tests)
 gtest_discover_tests(risk_tests)
 gtest_discover_tests(matching_engine_tests)
 gtest_discover_tests(gateway_tests)
+gtest_discover_tests(market_data_tests)
+gtest_discover_tests(persistence_tests)

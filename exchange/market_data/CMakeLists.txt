@@ -1,0 +1,8 @@
+add_library(market_data_lib INTERFACE)
+target_include_directories(market_data_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(market_data_lib INTERFACE common cppzmq_headers)
+target_compile_features(market_data_lib INTERFACE cxx_std_20)
+
+add_executable(market_data_service src/main.cpp)
+target_link_libraries(market_data_service PRIVATE market_data_lib)
+exchange_set_warnings(market_data_service)
