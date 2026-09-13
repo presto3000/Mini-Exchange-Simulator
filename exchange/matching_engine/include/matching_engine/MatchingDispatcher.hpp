@@ -53,6 +53,10 @@ public:
                 }
                 return encodeReject(msg.orderId, "order not found");
             }
+            case MessageType::BookQuery: {
+                auto msg = readBookQuery(reader);
+                return encodeBookSnapshot(buildSnapshot(msg.symbol));
+            }
             default:
                 return encodeReject(common::OrderId(0), "unknown message type");
             }
@@ -83,6 +87,34 @@ private:
         common::protocol::ByteWriter w;
         common::protocol::writeOrderReject(w, {id, reason});
         return common::protocol::encodeFrame(common::protocol::MessageType::OrderReject, w.bytes());
+    }
+
+    common::protocol::BookSnapshotMessage buildSnapshot(const common::Symbol& symbol) {
+        using namespace common::protocol;
+        BookSnapshotMessage snapshot;
+        snapshot.symbol = symbol;
+
+        auto it = engines_.find(symbol);
+        if (it == engines_.end()) {
+            return snapshot; // no engine yet for this symbol = empty book, not an error
+        }
+
+        const auto& book = it->second.book();
+        for (const auto& [price, level] : book.buyLevels()) {
+            snapshot.bids.push_back(
+                {price, level.totalQuantity(), static_cast<std::uint32_t>(level.orderCount())});
+        }
+        for (const auto& [price, level] : book.sellLevels()) {
+            snapshot.asks.push_back(
+                {price, level.totalQuantity(), static_cast<std::uint32_t>(level.orderCount())});
+        }
+        return snapshot;
+    }
+
+    static std::vector<std::byte> encodeBookSnapshot(const common::protocol::BookSnapshotMessage& snap) {
+        common::protocol::ByteWriter w;
+        common::protocol::writeBookSnapshot(w, snap);
+        return common::protocol::encodeFrame(common::protocol::MessageType::BookSnapshot, w.bytes());
     }
 
     std::unordered_map<common::Symbol, common::MatchingEngine> engines_;

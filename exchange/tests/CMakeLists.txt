@@ -43,6 +43,12 @@ exchange_set_warnings(persistence_tests)
 target_include_directories(risk_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 target_include_directories(gateway_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 
+add_executable(client_tests
+    client/CommandParserTests.cpp
+)
+target_link_libraries(client_tests PRIVATE client_lib GTest::gtest_main)
+exchange_set_warnings(client_tests)
+
 include(GoogleTest)
 gtest_discover_tests(common_tests)
 gtest_discover_tests(risk_tests)
@@ -50,3 +56,4 @@ gtest_discover_tests(matching_engine_tests)
 gtest_discover_tests(gateway_tests)
 gtest_discover_tests(market_data_tests)
 gtest_discover_tests(persistence_tests)
+gtest_discover_tests(client_tests)

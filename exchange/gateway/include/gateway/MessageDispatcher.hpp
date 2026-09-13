@@ -41,6 +41,16 @@ public:
                 return encodeResult(
                     processor_.modifyOrder(msg.orderId, msg.newPrice, msg.newQuantity));
             }
+            case MessageType::BookQuery: {
+                auto msg = readBookQuery(reader);
+                auto snap = processor_.queryBook(msg.symbol);
+                if (!snap.has_value()) {
+                    return encodeReject(common::OrderId(0), "book query failed");
+                }
+                ByteWriter w;
+                writeBookSnapshot(w, *snap);
+                return encodeFrame(MessageType::BookSnapshot, w.bytes());
+            }
             default:
                 return encodeReject(common::OrderId(0), "unknown message type");
             }

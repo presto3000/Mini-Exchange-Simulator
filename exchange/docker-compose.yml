@@ -72,6 +72,20 @@ services:
       - "9600:9600"
     depends_on:
       - matching_engine
+  client:
+    build:
+      context: .
+      dockerfile: docker/client.Dockerfile
+    environment:
+      GATEWAY_HOST: gateway
+      GATEWAY_PORT: "9000"
+      MARKET_DATA_HOST: market_data
+      MARKET_DATA_PORT: "9600"
+    depends_on:
+      - gateway
+      - market_data
+    stdin_open: true   # required for an interactive console app in Compose
+    tty: true
 
 volumes:
   pgdata:

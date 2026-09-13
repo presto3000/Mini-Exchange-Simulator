@@ -61,6 +61,27 @@ public:
         return common::protocol::OrderRejectMessage{id, "order not found"};
     }
 
+    std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) override {
+        using namespace common::protocol;
+        BookSnapshotMessage snapshot;
+        snapshot.symbol = symbol;
+
+        auto it = engines_.find(symbol);
+        if (it == engines_.end())
+            return snapshot;
+
+        const auto& book = it->second.book();
+        for (const auto& [price, level] : book.buyLevels()) {
+            snapshot.bids.push_back(
+                {price, level.totalQuantity(), static_cast<std::uint32_t>(level.orderCount())});
+        }
+        for (const auto& [price, level] : book.sellLevels()) {
+            snapshot.asks.push_back(
+                {price, level.totalQuantity(), static_cast<std::uint32_t>(level.orderCount())});
+        }
+        return snapshot;
+    }
+
 private:
     common::MatchingEngine& engineFor(const common::Symbol& symbol) {
         auto it = engines_.find(symbol);

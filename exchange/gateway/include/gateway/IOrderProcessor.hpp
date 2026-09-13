@@ -23,6 +23,12 @@ public:
     virtual ProcessResult cancelOrder(common::OrderId id) = 0;
     virtual ProcessResult modifyOrder(common::OrderId id, common::Price newPrice,
                                       common::Quantity newQuantity) = 0;
+
+    // Returns std::nullopt only on a transport-level failure; an empty
+    // (never-traded) symbol still returns a valid snapshot with empty
+    // bids/asks - "no book yet" is not an error, exactly the same
+    // principle as OrderBook::bestBid() returning std::optional
+    virtual std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) = 0;
 };
 
 } // namespace exchange::gateway

@@ -1,0 +1,8 @@
+add_library(client_lib INTERFACE)
+target_include_directories(client_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(client_lib INTERFACE common cppzmq_headers)
+target_compile_features(client_lib INTERFACE cxx_std_20)
+
+add_executable(exchange_client src/main.cpp)
+target_link_libraries(exchange_client PRIVATE client_lib)
+exchange_set_warnings(exchange_client)

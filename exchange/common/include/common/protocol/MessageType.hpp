@@ -16,6 +16,8 @@ enum class MessageType : std::uint8_t {
     OrderReject = 5,
     TradeEvent = 6,
     MarketDataSnapshot = 7,
+    BookQuery = 8,    
+    BookSnapshot = 9, 
 };
 
 } // namespace exchange::common::protocol

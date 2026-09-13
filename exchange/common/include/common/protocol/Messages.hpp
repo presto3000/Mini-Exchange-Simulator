@@ -116,4 +116,67 @@ inline MarketDataSnapshotMessage readMarketDataSnapshot(ByteReader& r) {
                                      lastQty,           Timestamp{Timestamp::duration(ticks)}};
 }
 
+struct BookQueryMessage {
+    Symbol symbol;
+};
+
+// One resting price level's aggregate state, for display purposes only
+// (mirrors PriceLevel::totalQuantity()/orderCount() -
+// this is the cold-path "reporting" data those methods were explicitly
+// designed to serve, now finally consumed).
+struct PriceLevelSnapshot {
+    Price price;
+    Quantity totalQuantity;
+    std::uint32_t orderCount;
+};
+
+struct BookSnapshotMessage {
+    Symbol symbol;
+    std::vector<PriceLevelSnapshot> bids; // best (highest) first
+    std::vector<PriceLevelSnapshot> asks; // best (lowest) first
+};
+
+inline void writeBookQuery(ByteWriter& w, const BookQueryMessage& m) {
+    w.writeString(m.symbol);
+}
+inline BookQueryMessage readBookQuery(ByteReader& r) {
+    return BookQueryMessage{r.readString()};
+}
+
+inline void writeLevelSnapshot(ByteWriter& w, const PriceLevelSnapshot& lvl) {
+    w.writeInt64(lvl.price.get());
+    w.writeInt64(lvl.totalQuantity.get());
+    w.writeUInt32(lvl.orderCount);
+}
+inline PriceLevelSnapshot readLevelSnapshot(ByteReader& r) {
+    const Price price(r.readInt64());
+    const Quantity qty(r.readInt64());
+    const auto count = r.readUInt32();
+    return PriceLevelSnapshot{price, qty, count};
+}
+
+inline void writeBookSnapshot(ByteWriter& w, const BookSnapshotMessage& m) {
+    w.writeString(m.symbol);
+    w.writeUInt32(static_cast<std::uint32_t>(m.bids.size()));
+    for (const auto& lvl : m.bids)
+        writeLevelSnapshot(w, lvl);
+    w.writeUInt32(static_cast<std::uint32_t>(m.asks.size()));
+    for (const auto& lvl : m.asks)
+        writeLevelSnapshot(w, lvl);
+}
+inline BookSnapshotMessage readBookSnapshot(ByteReader& r) {
+    Symbol symbol = r.readString();
+    BookSnapshotMessage msg;
+    msg.symbol = symbol;
+    const auto bidCount = r.readUInt32();
+    msg.bids.reserve(bidCount);
+    for (std::uint32_t i = 0; i < bidCount; ++i)
+        msg.bids.push_back(readLevelSnapshot(r));
+    const auto askCount = r.readUInt32();
+    msg.asks.reserve(askCount);
+    for (std::uint32_t i = 0; i < askCount; ++i)
+        msg.asks.push_back(readLevelSnapshot(r));
+    return msg;
+}
+
 } // namespace exchange::common::protocol

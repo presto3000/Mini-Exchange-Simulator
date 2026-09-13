@@ -41,6 +41,18 @@ public:
         return decodeResult(riskClient_.sendAndReceive(frame));
     }
 
+    std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) override {
+        using namespace common::protocol;
+        ByteWriter w;
+        writeBookQuery(w, {symbol});
+        auto frame = encodeFrame(MessageType::BookQuery, w.bytes());
+        auto response = riskClient_.sendAndReceive(frame);
+        if (response.type != MessageType::BookSnapshot)
+            return std::nullopt;
+        ByteReader reader(response.payload);
+        return readBookSnapshot(reader);
+    }
+
 private:
     static ProcessResult decodeResult(const common::protocol::DecodedFrame& frame) {
         using namespace common::protocol;

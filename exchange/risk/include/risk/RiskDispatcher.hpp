@@ -43,6 +43,9 @@ public:
                 // re-check buying power on a quantity-increasing
                 // modify - flagged as a future improvement.
                 return forwardToMatchingEngine(frame);
+            case MessageType::BookQuery:
+                // Book queries carry no risk implications
+                return forwardToMatchingEngine(frame);
             default:
                 return encodeReject(common::OrderId(0), "unknown message type");
             }
