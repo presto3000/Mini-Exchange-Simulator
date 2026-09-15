@@ -56,8 +56,6 @@ inline std::optional<DecodedFrame> tryDecodeFrame(const std::vector<std::byte>& 
                                    buffer.begin() + static_cast<long>(totalFrameSize));
 
     return DecodedFrame{type, std::move(payload), totalFrameSize};
-
-
 }
 
 } // namespace exchange::common::protocol

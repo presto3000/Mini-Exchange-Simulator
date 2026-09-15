@@ -2,8 +2,8 @@
 
 #include "common/Order.hpp"
 #include "common/Trade.hpp"
-#include "common/protocol/ByteWriter.hpp"
 #include "common/protocol/ByteReader.hpp"
+#include "common/protocol/ByteWriter.hpp"
 
 #include <chrono>
 
@@ -56,8 +56,5 @@ inline Trade readTrade(ByteReader& r) {
 
     return Trade(buyId, sellId, std::move(symbol), price, qty, ts);
 }
-
-
-
 
 } // namespace exchange::common::protocol

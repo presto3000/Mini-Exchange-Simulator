@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
+#include "TestFrameServer.hpp"
 #include "gateway/MessageDispatcher.hpp"
 #include "gateway/RemoteOrderProcessor.hpp"
 #include "matching_engine/MatchingDispatcher.hpp"
 #include "risk/RiskDispatcher.hpp"
-#include "TestFrameServer.hpp"
 
 #include <chrono>
 #include <thread>

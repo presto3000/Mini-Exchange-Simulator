@@ -41,7 +41,8 @@ public:
         return decodeResult(riskClient_.sendAndReceive(frame));
     }
 
-    std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) override {
+    std::optional<common::protocol::BookSnapshotMessage>
+    queryBook(const common::Symbol& symbol) override {
         using namespace common::protocol;
         ByteWriter w;
         writeBookQuery(w, {symbol});

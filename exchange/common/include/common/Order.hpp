@@ -1,8 +1,8 @@
 #pragma once
 
 #include "common/Types.hpp"
-#include <utility>
 #include <cassert>
+#include <utility>
 
 namespace exchange::common {
 

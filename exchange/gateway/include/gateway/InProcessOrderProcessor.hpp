@@ -61,7 +61,8 @@ public:
         return common::protocol::OrderRejectMessage{id, "order not found"};
     }
 
-    std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) override {
+    std::optional<common::protocol::BookSnapshotMessage>
+    queryBook(const common::Symbol& symbol) override {
         using namespace common::protocol;
         BookSnapshotMessage snapshot;
         snapshot.symbol = symbol;

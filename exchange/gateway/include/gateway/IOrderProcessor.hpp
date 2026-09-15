@@ -14,7 +14,8 @@ using ProcessResult =
 // checks, then matching, wherever those live. The Gateway's networking
 // code (Session/Server below) depends only on this interface, never on
 // a concrete transport. In a real distributed RemoteOrderProcessor
-// (Risk over TCP, Matching Engine over TCP) without touching a single line of socket-handling code here.
+// (Risk over TCP, Matching Engine over TCP) without touching a single line of socket-handling code
+// here.
 class IOrderProcessor {
 public:
     virtual ~IOrderProcessor() = default;
@@ -28,7 +29,8 @@ public:
     // (never-traded) symbol still returns a valid snapshot with empty
     // bids/asks - "no book yet" is not an error, exactly the same
     // principle as OrderBook::bestBid() returning std::optional
-    virtual std::optional<common::protocol::BookSnapshotMessage> queryBook(const common::Symbol& symbol) = 0;
+    virtual std::optional<common::protocol::BookSnapshotMessage>
+    queryBook(const common::Symbol& symbol) = 0;
 };
 
 } // namespace exchange::gateway

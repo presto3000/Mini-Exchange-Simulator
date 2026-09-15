@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancels any in-progress run for the same branch/PR when a new commit
+# lands, don't waste minutes on a build that's already obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+
+  # ---------------------------------------------------------------------
+  # Fast, no-compile check: fails in seconds if formatting is off
+  # ---------------------------------------------------------------------
+  format-check:
+    name: clang-format check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+
+      - name: Check formatting
+        run: |
+          # Collect every tracked .hpp/.cpp file, excluding fetched
+          # third-party sources that would live under build/_deps if a
+          # build had happened here (it hasn't, but this guards against
+          # ever checking in a vendored copy by mistake).
+          FILES=$(find . \( -name '*.hpp' -o -name '*.cpp' \) \
+                    -not -path './build/*' -not -path './out/*')
+          clang-format-18 --dry-run --Werror $FILES
+
+  # ---------------------------------------------------------------------
+  # The real build: configure, compile every service, run every test
+  # suite across every service's tests, on Linux (matches Docker/prod).
+  # ---------------------------------------------------------------------
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build \
+            libboost-system-dev \
+            libzmq3-dev \
+            libpqxx-dev libpq-dev pkg-config
+
+      # Caches CMake's FetchContent downloads (GoogleTest, cppzmq) AND
+      # the resulting compiled objects across runs, keyed on files that
+      # actually affect the build. A cache hit turns a ~3 minute cold
+      # build into a ~30 second incremental one - meaningful when this
+      # job runs on every single push.
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps
+            build/CMakeFiles
+          key: ${{ runner.os }}-build-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure --parallel
+
+      # Uploaded even on success - useful when investigating a flaky
+      # test after the fact without needing to reproduce locally first.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/Testing/
+
+  # ---------------------------------------------------------------------
+  # Static analysis: needs a configured build (for compile_commands.json)
+  # but not a full build+test cycle, so it's its own job rather than
+  # tacked onto build-and-test.
+  # ---------------------------------------------------------------------
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang-tidy-18 \
+            libboost-system-dev libzmq3-dev libpqxx-dev libpq-dev pkg-config
+
+      - name: Configure (generates compile_commands.json)
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Run clang-tidy
+        run: |
+          # Only lint OUR source files, never GoogleTest/cppzmq sources
+          # that FetchContent pulled into build/_deps - we don't own
+          # that code's style and shouldn't fail CI over it.
+          FILES=$(find common gateway risk matching_engine market_data \
+                       persistence client tests \
+                    \( -name '*.cpp' \))
+          run-clang-tidy-18 -p build $FILES

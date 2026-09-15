@@ -13,9 +13,9 @@ namespace exchange::client {
 
 // Runs a background thread subscribed directly to Market Data's PUB
 // feed and prints each incoming trade to the console. This is the
-// concrete client-side design decision above: TRADES is a live stream, so it uses the same PUB/SUB transport
-// Persistence and Market Data already use to talk to Matching Engine -
-// the client is simply one more subscriber on that same architecture.
+// concrete client-side design decision above: TRADES is a live stream, so it uses the same PUB/SUB
+// transport Persistence and Market Data already use to talk to Matching Engine - the client is
+// simply one more subscriber on that same architecture.
 class TradeTicker {
 public:
     TradeTicker(zmq::context_t& context, const std::string& marketDataHost, unsigned short port)
