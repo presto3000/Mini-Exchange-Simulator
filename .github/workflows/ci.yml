@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  PROJECT_DIR: exchange
+
+jobs:
+
+  # ---------------------------------------------------------------------
+  # Fast formatting check
+  # ---------------------------------------------------------------------
+  format-check:
+    name: clang-format check
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: Check formatting
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          FILES=$(find . \( -name '*.hpp' -o -name '*.cpp' \) \
+                    -not -path './build/*' \
+                    -not -path './build-ninja/*' \
+                    -not -path './out/*' \
+                    -not -path './.git/*')
+
+          clang-format-18 --dry-run --Werror $FILES
+
+  # ---------------------------------------------------------------------
+  # Build and test
+  # ---------------------------------------------------------------------
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            libboost-system-dev \
+            libzmq3-dev \
+            libpqxx-dev \
+            libpq-dev \
+            pkg-config
+
+      # Cache CMake FetchContent dependencies and build files.
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: |
+            exchange/build/_deps
+            exchange/build/CMakeFiles
+          key: ${{ runner.os }}-build-${{ hashFiles('exchange/**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Configure
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          cmake -S . \
+                -B build \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+      - name: Build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          cmake --build build --parallel
+
+      - name: Run tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          ctest \
+            --test-dir build \
+            --output-on-failure \
+            --parallel
+
+      # Uploaded even on success.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: exchange/build/Testing/
+
+  # ---------------------------------------------------------------------
+  # Static analysis
+  # ---------------------------------------------------------------------
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            clang-tidy-18 \
+            libboost-system-dev \
+            libzmq3-dev \
+            libpqxx-dev \
+            libpq-dev \
+            pkg-config
+
+      - name: Configure
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          cmake -S . \
+                -B build \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          FILES=$(find \
+            common \
+            gateway \
+            risk \
+            matching_engine \
+            market_data \
+            persistence \
+            client \
+            tests \
+            -name '*.cpp')
+
+          run-clang-tidy-18 -p build $FILES
