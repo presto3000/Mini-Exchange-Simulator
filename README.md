@@ -37,4 +37,4 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for detailed architecture and design decisions.
+See [`exchange/docs/architecture.md`] for detailed architecture and design decisions.
