@@ -24,7 +24,7 @@ TEST(SerializationTest, OrderRoundTripsExactly) {
 }
 
 TEST(SerializationTest, TradeRoundTripsExactly) {
-    const Trade original(OrderId(1), OrderId(2), "MSFT", Price(30000), Quantity(75),
+    const Trade original(TradeId(7), OrderId(1), OrderId(2), "MSFT", Price(30000), Quantity(75),
                          Timestamp{std::chrono::seconds(999)});
 
     ByteWriter writer;
@@ -33,6 +33,7 @@ TEST(SerializationTest, TradeRoundTripsExactly) {
     ByteReader reader(writer.bytes());
     Trade decoded = readTrade(reader);
 
+    EXPECT_EQ(decoded.id(), original.id()); 
     EXPECT_EQ(decoded.buyOrderId(), original.buyOrderId());
     EXPECT_EQ(decoded.sellOrderId(), original.sellOrderId());
     EXPECT_EQ(decoded.symbol(), original.symbol());

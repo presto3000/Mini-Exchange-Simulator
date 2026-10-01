@@ -28,7 +28,7 @@ TEST(PersistenceTradeEventHandlerTest, DecodedTradeIsSavedToRepository) {
     FakeTradeRepository repo;
     TradeEventHandler handler(repo);
 
-    Trade trade(OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
+    Trade trade(TradeId(7), OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
     ByteWriter w;
     writeTrade(w, trade);
 
@@ -44,7 +44,7 @@ TEST(PersistenceTradeEventHandlerTest, MultipleTradesAreAllSaved) {
     TradeEventHandler handler(repo);
 
     for (int i = 0; i < 3; ++i) {
-        Trade trade(OrderId(i), OrderId(i + 10), "MSFT", Price(30000 + i), Quantity(5),
+        Trade trade(TradeId(7), OrderId(i), OrderId(i + 10), "MSFT", Price(30000 + i), Quantity(5),
                     Timestamp{});
         ByteWriter w;
         writeTrade(w, trade);
@@ -52,4 +52,27 @@ TEST(PersistenceTradeEventHandlerTest, MultipleTradesAreAllSaved) {
     }
 
     EXPECT_EQ(repo.savedTrades.size(), 3u);
+}
+
+TEST(PersistenceTradeEventHandlerTest, DuplicateTradeIdIsSavedButRepositoryDecidesDeduping) {
+    // The handler layer itself doesn't dedupe - it hands every trade it
+    // decodes to the repository, exactly as before. Deduping is a
+    // PostgresTradeRepository/database concern (ON CONFLICT DO NOTHING),
+    // which real Postgres integration testing - not this fast unit test
+    // - is the right place to verify. This test documents that boundary
+    // explicitly rather than pretending the fake repository re-implements
+    // Postgres's constraint behavior.
+    FakeTradeRepository repo;
+    TradeEventHandler handler(repo);
+
+    Trade trade(TradeId(5), OrderId(1), OrderId(2), "AAPL", Price(100), Quantity(10), Timestamp{});
+    ByteWriter w;
+    writeTrade(w, trade);
+
+    handler.handleTradePayload(w.bytes());
+    handler.handleTradePayload(w.bytes()); // simulates Kafka redelivery
+
+    EXPECT_EQ(repo.savedTrades.size(), 2u); // handler passes both through by design
+    EXPECT_EQ(repo.savedTrades[0].id(),
+              repo.savedTrades[1].id()); // same TradeId - real DB would collapse these
 }

@@ -13,10 +13,14 @@ namespace exchange::common {
 // multiple services may hold copies of it concurrently.
 class Trade {
 public:
-    Trade(OrderId buyOrderId, OrderId sellOrderId, Symbol symbol, Price price, Quantity quantity,
-          Timestamp timestamp) noexcept
-        : buyOrderId_(buyOrderId), sellOrderId_(sellOrderId), symbol_(std::move(symbol)),
+    Trade(TradeId id, OrderId buyOrderId, OrderId sellOrderId, Symbol symbol, Price price,
+          Quantity quantity, Timestamp timestamp) noexcept
+        : id_(id), buyOrderId_(buyOrderId), sellOrderId_(sellOrderId), symbol_(std::move(symbol)),
           price_(price), quantity_(quantity), timestamp_(timestamp) {}
+
+    [[nodiscard]] TradeId id() const noexcept {
+        return id_;
+    }
 
     [[nodiscard]] OrderId buyOrderId() const noexcept {
         return buyOrderId_;
@@ -38,6 +42,7 @@ public:
     }
 
 private:
+    const TradeId id_;
     const OrderId buyOrderId_;
     const OrderId sellOrderId_;
     const Symbol symbol_;

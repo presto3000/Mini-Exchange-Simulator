@@ -99,9 +99,6 @@ else()
     )
 endif()
 
-
-# --- PostgreSQL client (libpqxx) ----------------------------------------
-
 # --- PostgreSQL client (libpqxx) ----------------------------------------
 
 if(WIN32)
@@ -139,6 +136,7 @@ endif()
 # --- Subprojects -------------------------------------------------------
 # Order matters only for readability here; CMake resolves dependencies
 # via target_link_libraries regardless of add_subdirectory order.
+
 
 add_subdirectory(common)
 add_subdirectory(gateway)

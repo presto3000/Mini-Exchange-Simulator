@@ -37,6 +37,7 @@ inline Order readOrder(ByteReader& r) {
 }
 
 inline void writeTrade(ByteWriter& w, const Trade& trade) {
+    w.writeUInt64(trade.id().get());
     w.writeUInt64(trade.buyOrderId().get());
     w.writeUInt64(trade.sellOrderId().get());
     w.writeString(trade.symbol());
@@ -46,6 +47,7 @@ inline void writeTrade(ByteWriter& w, const Trade& trade) {
 }
 
 inline Trade readTrade(ByteReader& r) {
+    const TradeId id(r.readUInt64());
     const OrderId buyId(r.readUInt64());
     const OrderId sellId(r.readUInt64());
     Symbol symbol = r.readString();
@@ -54,7 +56,8 @@ inline Trade readTrade(ByteReader& r) {
     const Timestamp::duration::rep ticks = r.readInt64();
     const Timestamp ts{Timestamp::duration(ticks)};
 
-    return Trade(buyId, sellId, std::move(symbol), price, qty, ts);
+    return Trade(id, buyId, sellId, std::move(symbol), price, qty,
+                 Timestamp{Timestamp::duration(ticks)});
 }
 
 } // namespace exchange::common::protocol

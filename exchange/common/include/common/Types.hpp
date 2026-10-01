@@ -28,6 +28,7 @@ struct PriceTag {};
 struct QuantityTag {};
 struct OrderIdTag {};
 struct BuyingPowerTag {};
+struct TradeIdTag {};
 
 // Price expressed in integer ticks (e.g. cents), never floating point.
 // Rationale: floating point prices cause rounding/comparison bugs in
@@ -58,6 +59,11 @@ using Timestamp = std::chrono::system_clock::time_point;
 // compiler rejects any code that accidentally compares or assigns one
 // to the other.
 using BuyingPower = StrongType<BuyingPowerTag, std::int64_t>;
+
+// Monotonic, per-MatchingEngine-instance trade sequence number. Exists
+// specifically to make trade persistence idempotent under Kafka's
+// at-least-once redelivery
+using TradeId = StrongType<TradeIdTag, std::uint64_t>;
 
 } // namespace exchange::common
 

@@ -3,6 +3,8 @@ FROM ubuntu:24.04 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzmq3-dev \
     libpqxx-dev \
+    libpq-dev \
+    librdkafka-dev \
     pkg-config \
     build-essential \
     cmake \
@@ -27,6 +29,9 @@ FROM ubuntu:24.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzmq5 \
     libpqxx-7.8 \
+    libpq5 \
+    librdkafka1 \
+    librdkafka++1 \
     libboost-system1.83.0 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

@@ -19,6 +19,10 @@ services:
     ports:
       - "9100:9100"
       - "9500:9500"   # trade event PUB feed
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - kafka
 
   risk:
     build:
@@ -57,9 +61,11 @@ services:
       POSTGRES_DB: exchange
       POSTGRES_USER: exchange
       POSTGRES_PASSWORD: exchange
+      KAFKA_BROKERS: kafka:9092
     depends_on:
       - matching_engine
       - postgres
+      - kafka
 
   market_data:
     build:
@@ -86,6 +92,20 @@ services:
       - market_data
     stdin_open: true   # required for an interactive console app in Compose
     tty: true
+
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
 
 volumes:
   pgdata:

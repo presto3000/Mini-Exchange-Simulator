@@ -150,15 +150,14 @@ private:
         return incoming.price().get() <= oppositePrice.get();
     }
 
-    [[nodiscard]] static Trade makeTrade(const Order& incoming, const Order& resting,
-                                         Price tradePrice, Quantity fillQty) {
+    [[nodiscard]] Trade makeTrade(const Order& incoming, const Order& resting, Price tradePrice,
+                                  Quantity fillQty) {
         const OrderId buyId = (incoming.side() == Side::Buy) ? incoming.id() : resting.id();
         const OrderId sellId = (incoming.side() == Side::Buy) ? resting.id() : incoming.id();
-
-        return Trade(buyId, sellId, incoming.symbol(), tradePrice, fillQty,
+        return Trade(TradeId(nextTradeId_++), buyId, sellId, incoming.symbol(), tradePrice, fillQty,
                      std::chrono::system_clock::now());
     }
-
+    std::uint64_t nextTradeId_ = 1; // per-instance counter; cross-instance uniqueness
     OrderBook book_;
 };
 

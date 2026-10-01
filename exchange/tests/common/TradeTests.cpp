@@ -6,7 +6,7 @@ using namespace exchange::common;
 
 TEST(TradeTest, ConstructionSetsAllFields) {
     const auto ts = Timestamp{std::chrono::seconds(500)};
-    const Trade trade(OrderId(1), OrderId(2), "AAPL", Price(2500), Quantity(50), ts);
+    const Trade trade(TradeId(7), OrderId(1), OrderId(2), "AAPL", Price(2500), Quantity(50), ts);
 
     EXPECT_EQ(trade.buyOrderId(), OrderId(1));
     EXPECT_EQ(trade.sellOrderId(), OrderId(2));
@@ -17,7 +17,7 @@ TEST(TradeTest, ConstructionSetsAllFields) {
 }
 
 TEST(TradeTest, IsCopyable) {
-    const Trade original(OrderId(1), OrderId(2), "AAPL", Price(2500), Quantity(50), Timestamp{});
+    const Trade original(TradeId(7), OrderId(1), OrderId(2), "AAPL", Price(2500), Quantity(50), Timestamp{});
     const Trade copy = original; // NOLINT - deliberately testing copy semantics
 
     EXPECT_EQ(copy.buyOrderId(), original.buyOrderId());

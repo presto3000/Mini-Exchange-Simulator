@@ -10,7 +10,7 @@ TEST(TradeEventHandlerTest, ProducesDecodableSnapshotFrame) {
     MarketDataStore store;
     TradeEventHandler handler(store);
 
-    Trade trade(OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
+    Trade trade(TradeId(123), OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
     ByteWriter w;
     writeTrade(w, trade);
 

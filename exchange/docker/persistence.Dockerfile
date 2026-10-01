@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzmq3-dev \
     libpqxx-dev \
     libpq-dev \
+    librdkafka-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -22,6 +23,7 @@ FROM ubuntu:24.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzmq5 \
+    librdkafka-dev \
     libpqxx-7.8t64 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

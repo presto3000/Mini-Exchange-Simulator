@@ -12,7 +12,7 @@ TEST(MarketDataStoreTest, NoSnapshotBeforeAnyTrade) {
 
 TEST(MarketDataStoreTest, TradeUpdatesSnapshotForItsSymbol) {
     MarketDataStore store;
-    Trade trade(OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
+    Trade trade(TradeId(123), OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{});
     store.onTrade(trade);
 
     auto snap = store.snapshot("AAPL");
@@ -25,8 +25,10 @@ TEST(MarketDataStoreTest, TradeUpdatesSnapshotForItsSymbol) {
 
 TEST(MarketDataStoreTest, LaterTradeOverwritesEarlierSnapshotForSameSymbol) {
     MarketDataStore store;
-    store.onTrade(Trade(OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{}));
-    store.onTrade(Trade(OrderId(3), OrderId(4), "AAPL", Price(15100), Quantity(20), Timestamp{}));
+    store.onTrade(Trade(TradeId(123), OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50),
+                        Timestamp{}));
+    store.onTrade(Trade(TradeId(123), OrderId(3), OrderId(4), "AAPL", Price(15100), Quantity(20),
+                        Timestamp{}));
 
     auto snap = store.snapshot("AAPL");
     ASSERT_TRUE(snap.has_value());
@@ -36,8 +38,10 @@ TEST(MarketDataStoreTest, LaterTradeOverwritesEarlierSnapshotForSameSymbol) {
 
 TEST(MarketDataStoreTest, DifferentSymbolsMaintainIndependentSnapshots) {
     MarketDataStore store;
-    store.onTrade(Trade(OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50), Timestamp{}));
-    store.onTrade(Trade(OrderId(3), OrderId(4), "MSFT", Price(30000), Quantity(10), Timestamp{}));
+    store.onTrade(Trade(TradeId(123), OrderId(1), OrderId(2), "AAPL", Price(15000), Quantity(50),
+                        Timestamp{}));
+    store.onTrade(Trade(TradeId(123), OrderId(3), OrderId(4), "MSFT", Price(30000), Quantity(10),
+                        Timestamp{}));
 
     EXPECT_EQ(store.snapshot("AAPL")->lastPrice, Price(15000));
     EXPECT_EQ(store.snapshot("MSFT")->lastPrice, Price(30000));
