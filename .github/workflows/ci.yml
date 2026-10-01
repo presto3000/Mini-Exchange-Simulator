@@ -63,6 +63,7 @@ jobs:
             libzmq3-dev \
             libpqxx-dev \
             libpq-dev \
+            librdkafka-dev \
             pkg-config
 
       # Cache CMake FetchContent dependencies and build files.
@@ -127,6 +128,7 @@ jobs:
             libzmq3-dev \
             libpqxx-dev \
             libpq-dev \
+            librdkafka-dev \
             pkg-config
 
       - name: Configure
